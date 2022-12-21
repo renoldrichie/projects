@@ -1,0 +1,133 @@
+  /*      Cyclistic bike-share analysis Chicago(October 2021 - September 2022)       */
+
+use cyclistic
+
+select * from clean_data
+limit 100
+
+
+/* repeat to insert all 12 months vto one table
+insert into t_data 
+	select * from t_a9;
+
+#cleaning data
+
+/*
+drop view cleaned_data
+
+
+create  view cleaned_data as
+select distinct ride_id,rideable_type,member_casual,started_at,ended_at,timediff(ended_at,started_at) as ride_length,
+year(started_at) as year,month(started_at) as month,dayofweek (started_at) as day_of_week,monthname(started_at) as month_name,dayname(started_at) as day_name,
+truncate(start_lat,2) as start_lat,truncate(start_lng,2) as start_lng,truncate(end_lat,2) as end_lat,truncate(end_lng,2) as end_lng,
+case when start_station_name= "" then "--N/A--" else start_station_name end as start_station_name,
+case when start_station_id= "" then "--N/A--" else start_station_id end as start_station_id,
+case when end_station_name= "" then "--N/A--" else end_station_name end as end_station_name,
+case when end_station_id= "" then "--N/A--" else end_station_id end as end_station_id
+from (select * from sample_tripdata where not ((year(started_at) = 2021 and month(started_at) = 9 or timediff(ended_at,started_at) <= 0))) as cleaned_data
+order by started_at;
+
+*/
+
+create table clean_data as
+	select distinct ride_id,rideable_type,member_casual,started_at,ended_at,timediff(ended_at,started_at) as ride_length,
+	year(started_at) as year,month(started_at) as month,dayofweek (started_at) as day_of_week,monthname(started_at) as month_name,dayname(started_at) as day_name,
+	truncate(start_lat,2) as start_lat,truncate(start_lng,2) as start_lng,truncate(end_lat,2) as end_lat,truncate(end_lng,2) as end_lng,
+	case when start_station_name= "" then "--N/A--" else start_station_name end as start_station_name,
+	case when start_station_id= "" then "--N/A--" else start_station_id end as start_station_id,
+	case when end_station_name= "" then "--N/A--" else end_station_name end as end_station_name,
+	case when end_station_id= "" then "--N/A--" else end_station_id end as end_station_id
+	from (select * from t_data where not ((year(started_at) = 2021 and month(started_at) = 9 or timediff(ended_at,started_at) <= 0))) as cleaned_data;
+
+create unique index clean_index_rideid
+on clean_data(ride_id)
+
+# DATA ANALYSIS
+
+/* #rides perweek old version
+select dayofweek (started_at) as dayofweek,dayname(started_at) as dayname, count(dayofweek (started_at)) as ride_count_by_week
+from (select * from sample_tripdata where not (year(started_at) = 2021 and month(started_at) = 9 and timediff(ended_at,started_at) <= 0)) as filtered_data
+group by dayofweek (started_at)
+order by dayofweek (started_at);
+*/
+
+#rides day_of_week
+select day_of_week,day_name, count(distinct ride_id) as ride_count_by_week,
+truncate(avg(TIME_TO_SEC(ride_length))/60,2) as avg_duration_in_minutes,
+truncate(min(TIME_TO_SEC(ride_length))/60,2) as min_duration_in_minutes,
+truncate(max(TIME_TO_SEC(ride_length))/60,2) as max_duration_in_minutes
+from clean_data
+group by day_of_week
+order by day_of_week;
+
+
+/* #rides permonth old version
+select year(started_at) as year,month(started_at) as month,count(month(started_at)) as ride_count_by_month 
+from (select * from sample_tripdata where not (year(started_at) = 2021 and month(started_at) = 9 and timediff(ended_at,started_at) <= 0)) as filtered_data
+group by year(started_at),month(started_at)
+order by year(started_at),month(started_at);
+*/
+
+#rides permonth
+select year,month,month_name,count(distinct ride_id) as ride_count_by_month
+truncate(avg(TIME_TO_SEC(ride_length))/60,2) as avg_duration_in_minutes,
+truncate(min(TIME_TO_SEC(ride_length))/60,2) as min_duration_in_minutes,
+truncate(max(TIME_TO_SEC(ride_length))/60,2) as max_duration_in_minutes
+from clean_data
+group by year,month
+order by year,month;
+
+#rides perweek
+select year,month,month_name,count(distinct ride_id) as ride_count_by_week,week(started_at) as week,
+truncate(avg(TIME_TO_SEC(ride_length))/60,2) as avg_duration_by_week_in_minutes
+from clean_data
+group by year,month,week
+order by year,month,week;
+
+
+#rides rental and membership
+
+/* old
+select member_casual,rideable_type,count(*) as ride_count
+from (select * from sample_tripdata where not (year(started_at) = 2021 and month(started_at) = 9 and timediff(ended_at,started_at) <= 0)) as filtered_data
+group by member_casual,rideable_type
+order by member_casual,rideable_type;
+*/
+
+select member_casual,rideable_type,count(*) as ride_count,
+truncate(avg(TIME_TO_SEC(ride_length))/60,2) as avg_duration_in_minutes
+from clean_data
+group by member_casual,rideable_type
+order by member_casual,rideable_type;
+
+#rides rental and membership by month
+
+select member_casual,rideable_type,year,month,concat(`year`,'-',`month`) AS month_of_year ,month_name,count(distinct ride_id) as ride_count,
+truncate(avg(TIME_TO_SEC(ride_length))/60,2) as avg_duration_by_month_in_minutes
+from clean_data
+group by member_casual,rideable_type,year,month
+order by year,month;
+
+
+select member_casual,rideable_type,day_of_week,day_name,count(distinct ride_id) as ride_count,
+truncate(avg(TIME_TO_SEC(ride_length))/60,2) as avg_duration_by_dayweek_in_minutes
+from clean_data
+group by member_casual,rideable_type,day_of_week
+order by day_of_week;
+
+
+#rides rental and membership by weekhour
+select member_casual,day_of_week,day_name,hour(started_at) as hour,count(distinct ride_id) as ride_count,
+truncate(avg(TIME_TO_SEC(ride_length))/60,2) as avg_duration_by_weekhour_in_minutes
+from clean_data
+group by member_casual,day_of_week,hour
+order by day_of_week,hour;
+
+
+#geography data
+select start_lat,start_lng,end_lat,end_lng
+from clean_data
+
+
+#csv export
+select start_lat,start_lng,end_lat,end_lng from clean_data into outfile "D:\\study material\\Google_Data_Analytics\\CASE_STUDY\\geodata.csv" fields terminated by ',' lines terminated by '\n';
